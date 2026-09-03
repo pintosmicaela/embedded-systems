@@ -5,19 +5,9 @@
 #include "wifi.h"
 #include "fan.h"
 
-//Ver el tema de la clave y contraseña
-IPAddress ip(192, 168, 1, 100);     // La IP que tú quieras (que esté libre)
-IPAddress gateway(192, 168, 1, 1);  // La IP de tu router
+IPAddress ip(192, 168, 1, 100);    
+IPAddress gateway(192, 168, 1, 1);  
 IPAddress subnet(255, 255, 255, 0);
-
-extern float get_current_temperature();
-extern float get_current_humidity();
-extern int get_current_light();
-extern float get_temperature_threshold();
-extern int get_light_threshold();
-
-extern void set_temperature_threshold(float value);
-extern void set_light_threshold(int value);
 
 namespace {
 const long gmtOffset_sec = -3 * 3600;
@@ -186,7 +176,7 @@ String get_time_string() {
 
 void setup_wifi() {
     Serial.begin(115200);
-    connectWifi("BVNET-2667", "771203AC");
+    connectWifi("NOMBREDEWIFI", "CONTRASEÑA");
     sync_hour();
 
     server.on("/", HTTP_GET, handleRoot);
