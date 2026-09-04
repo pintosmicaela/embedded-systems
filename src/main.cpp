@@ -3,7 +3,6 @@
 #include <user_interface.h>
 #include "wifi.h"
 #include "temperature.h"
-#include "presence.h"
 #include "led_rgb.h"
 #include "fan.h"
 
@@ -25,7 +24,6 @@ void task_read_humidity();
 void task_read_light();
 void task_check_temperature_alert();
 void task_control_light();
-void task_presence();
 void task_read_switch();
 
 struct Task {
@@ -41,7 +39,6 @@ Task tasks[] = {
   {"light_ctrl", task_control_light, 500, 0, false},
   {"read_temp", task_read_temperature, 1000, 0, false},
   {"read_light", task_read_light, 2000, 0, false},
-  {"presence", task_presence, 1200, 0, false},
   {"switch", task_read_switch, 50, 0, false},
 };
 
@@ -133,10 +130,6 @@ void task_control_light() {
   light_on();
 }
 
-void task_presence() {
-  loop_presence();
-}
-
 void task_read_switch() {
   static bool last_state = HIGH;
   bool current_state = GPIP(SWITCH_PIN);
@@ -200,7 +193,6 @@ void setup() {
 
   setup_wifi();
   setup_dht();
-  setup_presence();
   setup_led();
 }
 
