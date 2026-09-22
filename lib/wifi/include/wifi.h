@@ -12,6 +12,12 @@ bool time_is_synced();
 time_t get_epoch_time();
 String get_time_string();
 
+/* [Acoplamiento e inversión de dependencias]:
+ * ¿Por qué las declaraciones de estado global del sistema (sensores y umbrales) están en 'wifi.h'?
+ * Esto compromete la modularidad del código. El módulo 'wifi' debería ocuparse
+ * únicamente de conectividad y transporte HTTP. Los getters/setters del estado del sistema
+ * deberían residir en un módulo propio (ej. 'system_state.h' o 'app_config.h') hacia el cual
+ * dependan 'main' y 'wifi', evitando el acoplamiento cruzado. */
 float get_current_temperature();
 float get_current_humidity();
 int get_current_light();

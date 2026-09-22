@@ -1,7 +1,32 @@
 #include <Arduino.h>
 #include "temperature.h"
 
-//Para el GPIO 2 (D4), el registro es PERIBS_IO_MUX_GPIO2_U
+/* =========================================================================================
+ * [Sensor DHT11 y registros]:
+ * 1. Riesgo de bloqueo y reinicio por Watchdog (WDT):
+ *    En el bucle de lectura de los 40 bits ('pulseIn' manual), los 'while(!READ_PIN)' y
+ *    'while(READ_PIN)' no poseen timeout.
+ *    Si el sensor falla, se desconecta o la línea queda fija por ruido, el microcontrolador
+ *    entra en un bucle infinito con interrupciones deshabilitadas ('noInterrupts()').
+ *    Esto dispara inexorablemente el Watchdog por Hardware (WDT) reiniciando el ESP8266.
+ *
+ * 2. Impresión por puerto serie en sección crítica:
+ *    Dentro del bloque con interrupciones desactivadas se llama a 'Serial.println(...)'.
+ *    Escribir en el buffer UART con interrupciones globales apagadas puede provocar deadlocks
+ *    o demoras inaceptables si el buffer de transmisión se llena.
+ *
+ * 3. Suposición de frecuencia de CPU (80 MHz):
+ *    El umbral '50 * 80' asume que la CPU siempre corre a 80 MHz. Si el ESP8266 se configura
+ *    a 160 MHz (frecuencia común en PlatformIO para este SoC), 'ccount' avanza al doble de velocidad
+ *    y todas las lecturas se interpretarán erróneamente como ceros.
+ *
+ * 4. Interrupción del stack Wi-Fi:
+ *    Desactivar interrupciones por varios milisegundos interrumpe las tareas críticas de RF
+ *    y software interrupts del stack WiFi del ESP8266, provocando desconexiones eventuales.
+ * ========================================================================================= */
+
+// Typo común de IA en el comentario original: PERIBS_IO_MUX en lugar de PERIPHS_IO_MUX
+// Para el GPIO 2 (D4), el registro es PERIPHS_IO_MUX_GPIO2_U
 #define PIN_CONFIG_REG *((volatile uint32_t *)0x60000838)
 
 // Registros rápidos para ESP8266 (GPIO 2 / D4)
@@ -44,9 +69,9 @@ DHT_Data read_dht_raw(){
     //pinMode(D4, OUTPUT);
     SET_OUTPUT;
     SET_LOW;
-    delay(18); //El sensor necesita el puslo de arranque
+    delay(18); //El sensor necesita el pulso de arranque
 
-    //seccion critica
+    // Sección crítica: desactiva interrupciones en el procesador
     noInterrupts();
     SET_HIGH;
     SET_INPUT;
@@ -56,6 +81,7 @@ DHT_Data read_dht_raw(){
     uint32_t timeout = get_cycles();
     while (READ_PIN){
         if (get_cycles() - timeout > 10000) {
+            // [Llamada a Serial con interrupciones deshabilitadas]
             Serial.println("Timeout 1: line stayed HIGH");
             interrupts();
             return result;
@@ -65,6 +91,7 @@ DHT_Data read_dht_raw(){
     timeout = get_cycles();
     while (!READ_PIN){
         if (get_cycles() - timeout > 20000) {
+            // [Llamada a Serial con interrupciones deshabilitadas]
             Serial.println("Timeout 2: line stayed LOW");
             interrupts();
             return result;
@@ -74,13 +101,16 @@ DHT_Data read_dht_raw(){
     timeout = get_cycles();
     while (READ_PIN) {
         if (get_cycles() - timeout > 30000) {
+            // [Llamada a Serial con interrupciones deshabilitadas]
             Serial.println("Timeout 3: line stayed HIGH");
             interrupts();
             return result;
         }
     }
 
-    //pulseIn(40)
+    // [Seguridad de ejecución]:
+    // Los dos 'while' siguientes carecen de guarda por timeout. Si el pin no conmuta,
+    // el sistema se congela para siempre aquí adentro con interrupciones deshabilitadas.
     for (int i=0; i< 40; i++){
         //inicio del bit
         while(!READ_PIN);
@@ -94,9 +124,10 @@ DHT_Data read_dht_raw(){
     interrupts(); 
     //fin de la seccion critica
 
-    //80MHz, 1 microsegundo = 80 ciclos
-    //un 0 dura ~26us (2080 ciclos), un 1 dura ~70us (5600 ciclos)
-    //utilizo un umbral intermedio 50us (4000 ciclos)
+    // [Asume reloj fijo de 80 MHz sin consultar ESP.getCpuFreqMHz()]
+    // 80MHz, 1 microsegundo = 80 ciclos
+    // un 0 dura ~26us (2080 ciclos), un 1 dura ~70us (5600 ciclos)
+    // utilizo un umbral intermedio 50us (4000 ciclos)
     uint32_t threshold = 50 * 80;
 
     for (int i = 0; i < 40; i++) {
@@ -116,7 +147,10 @@ DHT_Data read_dht_raw(){
     return result;
 }
 
-// En lugar de dos funciones separadas, usa una que devuelva ambos
+/* [Código sin uso (Dead code)]:
+ * Esta función fue generada pero jamás se utiliza ni se llama en ningún punto del proyecto.
+ * Realiza una segunda lectura de 'read_dht_raw()' redundante que violaría los tiempos
+ * de refresco mínimos del sensor DHT11 (1 a 2 segundos entre lecturas). */
 bool check_thresholds(float t_limit, float h_limit) {
     DHT_Data raw = read_dht_raw();
     if (!raw.success) return false;
