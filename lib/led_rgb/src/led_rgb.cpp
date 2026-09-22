@@ -26,6 +26,12 @@ void turn_off(){
     GPOC = (1 << RED_GPIO) | (1 << GREEN_GPIO) | (1 << BLUE_GPIO);
 }
 
+/* [Control RGB y ausencia de PWM]:
+ * La función recibe enteros 'r, g, b' simulando una escala analógica (0 a 255),
+ * pero evalúa la condición binaria '(canal > 0)' escribiendo directamente en GPOS/GPOC.
+ * No implementa modulación por ancho de pulso (PWM ni analogWrite). Por ende, no es
+ * un control de color real; solo conmuta 8 combinaciones digitales ON/OFF.
+ * En main.cpp solo se invoca como blanco puro (255, 255, 255) o apagado (turn_off). */
 void set_color(int r, int g, int b) {
   uint32_t to_set = 0;
   uint32_t to_clear = 0;

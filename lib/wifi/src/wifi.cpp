@@ -5,6 +5,10 @@
 #include "wifi.h"
 #include "fan.h"
 
+/* [Variables sin uso (Dead code)]:
+ * Se definen estas direcciones IP estáticas pero nunca se pasan a 'WiFi.config(...)'.
+ * Por lo tanto, el microcontrolador siempre solicita configuración por DHCP y estas
+ * variables no tienen efecto en la ejecución. */
 IPAddress ip(192, 168, 1, 100);    
 IPAddress gateway(192, 168, 1, 1);  
 IPAddress subnet(255, 255, 255, 0);
@@ -16,6 +20,12 @@ const char* ntpServer = "pool.ntp.org";
 const time_t MIN_VALID_EPOCH = 8 * 3600 * 2;
 ESP8266WebServer server(80);
 
+/* [Gestión de memoria y fragmentación de heap]:
+ * En microcontroladores con recursos limitados (~40KB de RAM libre en ESP8266),
+ * el uso intensivo de la clase 'String' con continuas concatenaciones y reasignaciones
+ * dinámicas (heap) en el procesamiento HTTP y JSON termina fragmentando la memoria.
+ * Es una práctica desaconsejada para sistemas embebidos continuos 24/7; se recomienda
+ * el uso de buffers estáticos (char[]) o librerías como ArduinoJson con buffer fijo. */
 String urlDecode(const String& input) {
     String decoded;
     decoded.reserve(input.length());
@@ -110,6 +120,16 @@ void handleNotFound() {
 }
 }
 
+/* [Bloqueo potencial del sistema]:
+ * 1. Bucle bloqueante en setup():
+ *    Si el router está apagado, la señal es débil o las credenciales fallan,
+ *    el sistema queda en este 'while' dentro de setup().
+ *    Consecuencia: no se inicia loop(), por lo que el control del ventilador,
+ *    la lectura de temperatura, la luz y el interruptor físico quedan inoperativos.
+ *    En un sistema embebido, la conectividad suele desacoplarse para no bloquear el control local.
+ * 2. Credenciales en código fuente:
+ *    Credenciales de demostración ("NOMBREDEWIFI", "CONTRASEÑA") en el código fuente
+ *    sin provisión de WiFiManager, archivo de configuración ni almacenamiento en NVS/EEPROM. */
 void connectWifi(const char* ssid, const char* password) {
     WiFi.persistent(false);
     WiFi.setAutoReconnect(true);
@@ -138,6 +158,10 @@ const char* wl_status_to_string(wl_status_t status) {
     }
 }
 
+/* [Sincronización NTP no utilizada]:
+ * Sincroniza hora vía NTP demorando el arranque hasta 10 segundos adicionales (20 x 500ms).
+ * Sin embargo, ni 'get_epoch_time()' ni 'get_time_string()' son consumidos en ningún punto
+ * de la aplicación (ni en el endpoint /status, ni en logs, ni en reglas de horario). */
 void sync_hour() {
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
     Serial.print("Synchronizing time with NTP server");
